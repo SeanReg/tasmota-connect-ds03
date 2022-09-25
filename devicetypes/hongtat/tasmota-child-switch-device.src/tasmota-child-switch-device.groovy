@@ -19,8 +19,9 @@
 
 String driverVersion() { return "20200913" }
 metadata {
-    definition(name: "Tasmota Child Switch Device", namespace: "hongtat", author: "HongTat Tan", vid: "generic-switch") {
+    definition(name: "Tasmota Child Switch Device", namespace: "hongtat", author: "HongTat Tan", vid: "generic-dimmer") {
         capability "Switch"
+        capability "Switch Level"
         capability "Actuator"
         capability "Sensor"
         capability "Health Check"
@@ -30,7 +31,7 @@ metadata {
     tiles(scale: 2) {
         multiAttributeTile(name: "switch", width: 6, height: 4, canChangeIcon: true) {
             tileAttribute("device.switch", key: "PRIMARY_CONTROL") {
-                attributeState "on", label: '${name}', action: "switch.off", icon: "st.switches.light.on", backgroundColor: "#00a0dc"
+                attributeState "on", label: '${name}', action: "switch.off", icon: "st.switches.light.on", backgroundColor: "#00e27a"
                 attributeState "off", label: '${name}', action: "switch.on", icon: "st.switches.light.off", backgroundColor: "#ffffff"
             }
         }
@@ -46,6 +47,7 @@ metadata {
 def installed() {
     sendEvent(name: "checkInterval", value: 30 * 60 + 2 * 60, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID])
     sendEvent(name: "switch", value: "off")
+    sendEvent(name: "level", value: 100)
 }
 
 void on() {
@@ -54,6 +56,11 @@ void on() {
 
 void off() {
     parent.childOff(device.deviceNetworkId)
+}
+
+def setLevel(value) {
+    log.debug "setLevel >> value: $value"
+    parent.childSetLevel(device.deviceNetworkId, value)
 }
 
 def ping() {

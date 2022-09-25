@@ -1,21 +1,21 @@
 /**
- *  Tasmota - Fan
- *
- *  Copyright 2020 AwfullySmart.com - HongTat Tan
- *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+*  Tasmota - Fan
+*
+*  Copyright 2020 AwfullySmart.com - HongTat Tan
+*
+*  This program is free software: you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation, either version 3 of the License, or
+*  (at your option) any later version.
+*
+*  This program is distributed in the hope that it will be useful,
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+*  GNU General Public License for more details.
+*
+*  You should have received a copy of the GNU General Public License
+*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 String driverVersion() { return "20201227" }
 import groovy.json.JsonSlurper
@@ -138,7 +138,7 @@ def initialize() {
     sendEvent(name: "checkInterval", value: parent.checkInterval(), displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID])
 
     parent.callTasmota(this, "Status 5")
-    parent.callTasmota(this, "Backlog Rule1 ON FanSpeed#data DO WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"FanSpeed\":\"%value%\"}} ENDON ON Power1#state DO WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"POWER1\":\"%value%\"}} ENDON ON Wifi#Connected DO WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"cb\":\"Status 11\"} ENDON;Rule1 1")
+    parent.callTasmota(this, "Backlog Rule1 on TuyaReceived#Data=55AA03070005030400010016 do WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"FanSpeed\":\"1\"}} endon on TuyaReceived#Data=55AA03070005030400010117 do WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"FanSpeed\":\"2\"}} endon on TuyaReceived#Data=55AA03070005030400010218 do WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"FanSpeed\":\"3\"}} endon on TuyaReceived#Data=55AA03070005030400010319 do WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"FanSpeed\":\"4\"}} endon ON Power2#state DO WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"POWER2\":\"%value%\"}} ENDON ON Power1#state DO WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"POWER1\":\"%value%\"}} ENDON ON Wifi#Connected DO WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"cb\":\"Status 11\"} ENDON ON Dimmer#state DO WebSend ["+device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")+"] /?json={\"StatusSTS\":{\"Dimmer\":\"%value%\"}} ENDON;Rule1 1")
     refresh()
 }
 
@@ -172,14 +172,17 @@ def parseEvents(status, json) {
         if (fanSpeed != null) {
             def rawLevel = 0
             if (fanSpeed == 1) {
-                rawLevel = 32
+                rawLevel = 25
                 state.lastFanSpeed = 1
             } else if (fanSpeed == 2) {
-                rawLevel = 66
+                rawLevel = 50
                 state.lastFanSpeed = 2
             } else if (fanSpeed == 3) {
-                rawLevel = 100
+                rawLevel = 75
                 state.lastFanSpeed = 3
+            } else if (fanSpeed == 4) {
+            rawLevel = 100
+                state.lastFanSpeed = 4
             }
             def value = (rawLevel ? "on" : "off")
             events << sendEvent(name: "switch", value: value)
@@ -187,9 +190,19 @@ def parseEvents(status, json) {
             events << sendEvent(name: "fanSpeed", value: fanSpeed)
             log.debug "Fan switch: '" + value + "', level: '${rawLevel}', fanSpeed: '${fanSpeed}'"
         }
+        def fanPower = (json?.StatusSTS?.POWER1 != null) ? (json?.StatusSTS?.POWER1) : ((json?.POWER1 != null) ? json?.POWER1 : null)
+        if (fanPower != null) {
+        if (fanPower in ["ON", "1"]) {
+            events << sendEvent(name: "switch", value: "on")
+            log.debug "Fan switch: 'on'"
+            } else if (fanPower in ["OFF", "0"]) {
+            events << sendEvent(name: "switch", value: "off")
+            log.debug "Fan switch: 'off'"
+            }
+        }
 
         // Light
-        def power = (json?.StatusSTS?.POWER1 != null) ? (json?.StatusSTS?.POWER1) : ((json?.POWER1 != null) ? json?.POWER1 : null)
+        def power = (json?.StatusSTS?.POWER2 != null) ? (json?.StatusSTS?.POWER2) : ((json?.POWER2 != null) ? json?.POWER2 : null)
         if (power != null) {
             if (power in ["ON", "1"]) {
                 childDevices[0]?.sendEvent(name: "switch", value: "on")
@@ -199,6 +212,15 @@ def parseEvents(status, json) {
                 log.debug "Light switch: 'off'"
             }
         }
+
+    // Dimmer
+    if (json?.StatusSTS?.Dimmer != null) {
+        def level = json?.StatusSTS?.Dimmer?.toInteger()
+        if (level >= 0 && level <= 100) {
+            childDevices[0]?.sendEvent(name: "level", value: level)
+        }
+        log.debug "Dimmer: '$level'"
+    }
 
         // MAC
         if (json?.StatusNET?.Mac != null) {
@@ -266,7 +288,7 @@ def off() {
     if (healthState == true) {
         turnOff()
     }
-    parent.callTasmota(this, "FanSpeed 0")
+    parent.callTasmota(this, "POWER1 0")
 }
 
 def turnOff() {
@@ -275,16 +297,25 @@ def turnOff() {
     sendEvent(name: "fanSpeed", value: 0)
 }
 
+def childSetLevel(dni, value) {
+log.debug "childSetLevel >> value: $value"
+def valueaux = value as Integer
+def level = Math.max(Math.min(valueaux, 100), 0)
+parent.callTasmota(this, "DIMMER " + level)
+}
+
 def setLevel(value, rate = null) {
     def level = value as Integer
     level = level == 255 ? level : Math.max(Math.min(level, 99), 0)
 
-    if (1 <= level && level <= 32) {
+    if (1 <= level && level <= 25) {
         low()
-    } else if (33 <= level && level <= 66) {
+    } else if (26 <= level && level <= 50) {
         medium()
-    } else if (67 <= level && level <= 100) {
+    } else if (51 <= level && level <= 75) {
         high()
+    } else if (76 <= level && level <= 100) {
+        max()
     } else {
         off()
     }
@@ -294,19 +325,22 @@ def setLevel(value, rate = null) {
 def setFanSpeed(speed) {
     if (speed as Integer == 0) {
         off()
-    } else if (speed as Integer == 1) {
+    } else {
+    parent.callTasmota(this, "POWER1 1")
+    if (speed as Integer == 1) {
         low()
     } else if (speed as Integer == 2) {
         medium()
     } else if (speed as Integer == 3) {
         high()
     } else if (speed as Integer == 4) {
-        high()
+        max()
+    }
     }
 }
 
 def raiseFanSpeed() {
-    setFanSpeed(Math.min((device.currentValue("fanSpeed") as Integer) + 1, 3))
+    setFanSpeed(Math.min((device.currentValue("fanSpeed") as Integer) + 1, 4))
 }
 
 def lowerFanSpeed() {
@@ -315,17 +349,22 @@ def lowerFanSpeed() {
 
 def low() {
     state.lastFanSpeed = 1
-    parent.callTasmota(this, "FanSpeed 1")
+    parent.callTasmota(this, "TuyaSend4 3,0")
 }
 
 def medium() {
     state.lastFanSpeed = 2
-    parent.callTasmota(this, "FanSpeed 2")
+    parent.callTasmota(this, "TuyaSend4 3,1")
 }
 
 def high() {
     state.lastFanSpeed = 3
-    parent.callTasmota(this, "FanSpeed 3")
+    parent.callTasmota(this, "TuyaSend4 3,2")
+}
+
+def max() {
+state.lastFanSpeed = 4
+parent.callTasmota(this, "TuyaSend4 3,3")
 }
 
 def refresh(dni=null) {
@@ -350,6 +389,7 @@ def refresh(dni=null) {
     if (state.dni == null || state.dni == "" || actualDeviceNetworkId != state.dni) {
         parent.callTasmota(this, "Status 5")
     }
+    parent.callTasmota(this, "TuyaSend8")
     parent.callTasmota(this, "Status 11")
 }
 
@@ -358,11 +398,11 @@ def ping() {
 }
 
 def childOn(dni) {
-    parent.callTasmota(this, "POWER1 1")
+    parent.callTasmota(this, "POWER2 1")
 }
 
 def childOff(dni) {
-    parent.callTasmota(this, "POWER1 0")
+    parent.callTasmota(this, "POWER2 0")
 }
 
 def childTurnOff() {
